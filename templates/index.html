@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>CPU Scheduling Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  /* (Same styling as before, omitted here for brevity) */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 30px 40px;
+    font-family: 'Montserrat', sans-serif;
+    background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
+    color: #2e2e3e;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h2 { margin-bottom: 30px; font-weight: 600; font-size: 2.2rem; letter-spacing: 1.2px; text-shadow: 1px 1px 3px rgba(46,46,62,0.1);}
+  .glass {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 18px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 25px 30px;
+    margin-bottom: 25px;
+    width: 100%;
+    max-width: 720px;
+  }
+  label {
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  input[type="number"], input[type="text"], select {
+    border: none;
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 1rem;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    box-shadow: inset 1px 1px 6px rgba(255,255,255,0.8),
+                inset -1px -1px 6px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+    color: #2e2e3e;
+  }
+  input[type="number"]:focus, input[type="text"]:focus, select:focus {
+    outline: none;
+    box-shadow:
+      0 0 8px 3px rgba(86, 132, 255, 0.6),
+      inset 1px 1px 6px rgba(255,255,255,0.9);
+  }
+  button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    padding: 12px 28px;
+    border-radius: 20px;
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 6px 15px rgba(118,75,162,0.6);
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+    margin-top: 12px;
+  }
+  button:hover {
+    transform: scale(1.08);
+    box-shadow: 0 8px 20px rgba(118,75,162,0.9);
+  }
+  #processInputs div.process-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    align-items: flex-start;
+  }
+  #processInputs div.process-row label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  #quantumDiv, #priorityDiv {
+    margin-top: 10px;
+  }
+  #ganttChart {
+    display: flex;
+    height: 60px;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1.5px solid rgba(118,75,162,0.6);
+    box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+    margin-top: 20px;
+    cursor: default;
+    user-select: none;
+  }
+  #ganttChart div {
+    border-right: 1px solid rgba(255,255,255,0.5);
+    text-align: center;
+    line-height: 60px;
+    font-weight: 700;
+    color: white;
+    font-size: 15px;
+    text-shadow: 1px 1px 5px rgba(0,0,0,0.35);
+    opacity: 0;
+    animation: fadeInGantt 0.6s forwards;
+  }
+  #ganttChart div:last-child {
+    border-right: none;
+  }
+  #ganttChart div:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 12px 3px rgba(255,255,255,0.5);
+    transform: scale(1.05);
+    transition: all 0.3s ease;
+    z-index: 10;
+  }
+  @keyframes fadeInGantt {
+    to {opacity: 1;}
+  }
+  .timeContainer {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 14px;
+    color: #4c4c6d;
+    margin-bottom: 6px;
+    user-select: none;
+    max-width: 720px;
+    width: 100%;
+  }
+  .timeContainer span {
+    flex-shrink: 0;
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 720px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(118,75,162,0.2);
+    margin-top: 30px;
+  }
+  th, td {
+    padding: 14px 20px;
+    text-align: center;
+    border-bottom: 1px solid #ccc;
+    font-size: 14.5px;
+    color: #2e2e3e;
+  }
+  th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) {
+    background-color: rgba(118,75,162,0.07);
+  }
+  tbody tr:hover {
+    background-color: rgba(118,75,162,0.15);
+    transition: background-color 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<h2>CPU Scheduling Simulator</h2>
+
+<div class="glass">
+  <label for="numProcesses">Number of processes:</label>
+  <input type="number" id="numProcesses" min="1" placeholder="e.g. 4" />
+  <button onclick="createProcessInputs()">Submit</button>
+</div>
+
+<div id="processInputs"></div>
+
+<script>
+function createProcessInputs() {
+  const n = parseInt(document.getElementById('numProcesses').value);
+  const container = document.getElementById('processInputs');
+  container.innerHTML = '';
+
+  if (!n || n <= 0) {
+    alert("Please enter a valid number of processes");
+    return;
+  }
+
+  let innerHTML = '<div class="glass">';
+
+  for(let i=0; i<n; i++) {
+    innerHTML += `
+      <div class="process-row">
+        <label>PID
+          <input type="text" id="pid${i}" value="P${i+1}" />
+        </label>
+        <label>Arrival Time
+          <input type="number" id="at${i}" min="0" value="0" />
+        </label>
+        <label>Burst Time
+          <input type="number" id="bt${i}" min="1" value="1" />
+        </label>
+        <label>Priority
+          <input type="number" id="pr${i}" min="1" placeholder="optional" />
+        </label>
+      </div>`;
+  }
+
+  innerHTML += `
+    <div>
+      <label>Algorithm:
+        <select id="algorithm" onchange="toggleQuantumPriority()">
+          <option value="fcfs">FCFS</option>
+          <option value="sjf">SJF</option>
+          <option value="priority">Priority Scheduling</option>
+          <option value="rr">Round Robin</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="quantumDiv" style="display:none; margin-top:10px;">
+      <label>Quantum (for RR): <input type="number" id="quantum" min="1" /></label>
+    </div>
+
+    <div id="priorityDiv" style="display:none; margin-top:10px;">
+      <label>Priority Type:
+        <select id="priorityType">
+          <option value="">--Select--</option>
+          <option value="1">Lower number = higher priority</option>
+          <option value="2">Higher number = higher priority</option>
+        </select>
+      </label>
+    </div>
+
+    <button style="margin-top:20px;" onclick="simulate()">Simulate</button>
+  </div>`;
+
+  container.innerHTML = innerHTML;
+
+  container.innerHTML += `
+    <h3 style="margin-top:30px; color:#2e2e3e; font-weight:600;">Gantt Chart</h3>
+    <div id="ganttTimeIntervals" class="timeContainer"></div>
+    <div id="ganttChart"></div>
+
+    <h3 style="margin-top:30px; color:#2e2e3e; font-weight:600;">Results</h3>
+    <table id="resultTable">
+      <thead>
+        <tr>
+          <th>PID</th><th>AT</th><th>BT</th><th>PR</th><th>ST</th><th>CT</th><th>RT</th><th>TAT</th><th>WT</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>`;
+}
+
+function toggleQuantumPriority() {
+  const algo = document.getElementById('algorithm').value;
+  document.getElementById('quantumDiv').style.display = (algo === 'rr') ? 'block' : 'none';
+  document.getElementById('priorityDiv').style.display = (algo === 'priority') ? 'block' : 'none';
+}
+
+function simulate() {
+  const n = parseInt(document.getElementById('numProcesses').value);
+  let processes = [];
+
+  for(let i=0; i<n; i++) {
+    const pid = document.getElementById(`pid${i}`).value.trim() || `P${i+1}`;
+    const at = parseInt(document.getElementById(`at${i}`).value);
+    const bt = parseInt(document.getElementById(`bt${i}`).value);
+    const prVal = document.getElementById(`pr${i}`).value;
+    const pr = prVal ? parseInt(prVal) : null;
+
+    if (isNaN(at) || at < 0 || isNaN(bt) || bt < 1) {
+      alert(`Invalid Arrival or Burst time for process ${pid}`);
+      return;
+    }
+
+    processes.push({ pid, at, bt, pr });
+  }
+
+  const algorithm = document.getElementById('algorithm').value;
+  let quantum = 0;
+  if(algorithm === 'rr') {
+    quantum = parseInt(document.getElementById('quantum').value);
+    if(isNaN(quantum) || quantum <= 0) {
+      alert("Enter a valid Quantum time for Round Robin");
+      return;
+    }
+  }
+
+  let priorityType = null;
+  if (algorithm === 'priority') {
+    priorityType = document.getElementById('priorityType').value;
+    if(priorityType !== '1' && priorityType !== '2') {
+      alert("Please select Priority Type");
+      return;
+    }
+  }
+
+  // Run scheduling algorithms
+  let result = null;
+
+  switch(algorithm) {
+    case 'fcfs':
+      result = fcfs(processes);
+      break;
+    case 'sjf':
+      result = sjf(processes);
+      break;
+    case 'priority':
+      result = priorityScheduling(processes, priorityType);
+      break;
+    case 'rr':
+      result = roundRobin(processes, quantum);
+      break;
+    default:
+      alert('Algorithm not supported');
+      return;
+  }
+
+  // Show results
+  displayResults(result);
+}
+
+function displayResults({timeline, processes}) {
+  // timeline = [{pid, start, end}, ...]
+  // processes = [{pid, at, bt, pr, st, ct, rt, tat, wt}]
+
+  // Gantt chart
+  const gantt = document.getElementById('ganttChart');
+  const ganttTimes = document.getElementById('ganttTimeIntervals');
+  gantt.innerHTML = '';
+  ganttTimes.innerHTML = '';
+
+  if (timeline.length === 0) return;
+
+  // Total time
+  const totalTime = timeline[timeline.length-1].end;
+
+  // Generate colors for each PID
+  const colors = {};
+  const baseColors = [
+    '#667eea','#764ba2','#f9a825','#43a047','#e53935','#00acc1','#fb8c00','#6d4c41','#3949ab','#d81b60'
+  ];
+  let colorIndex = 0;
+  timeline.forEach(t => {
+    if (!colors[t.pid]) {
+      colors[t.pid] = baseColors[colorIndex % baseColors.length];
+      colorIndex++;
+    }
+  });
+
+  // Create gantt blocks
+  timeline.forEach(segment => {
+    const widthPercent = ((segment.end - segment.start) / totalTime) * 100;
+    const div = document.createElement('div');
+    div.style.width = widthPercent + '%';
+    div.style.backgroundColor = colors[segment.pid];
+    div.textContent = segment.pid;
+    gantt.appendChild(div);
+  });
+
+  // Time markers
+  // Show time labels at start and end of each segment (if different)
+  let lastTime = null;
+  timeline.forEach(segment => {
+    if (lastTime !== segment.start) {
+      const spanStart = document.createElement('span');
+      spanStart.textContent = segment.start;
+      ganttTimes.appendChild(spanStart);
+    }
+    lastTime = segment.end;
+  });
+  // Add final end time label
+  const spanEnd = document.createElement('span');
+  spanEnd.textContent = timeline[timeline.length-1].end;
+  ganttTimes.appendChild(spanEnd);
+
+  // Results table
+  const tbody = document.querySelector('#resultTable tbody');
+  tbody.innerHTML = '';
+  processes.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.pid}</td>
+      <td>${p.at}</td>
+      <td>${p.bt}</td>
+      <td>${p.pr !== null && p.pr !== undefined ? p.pr : '-'}</td>
+      <td>${p.st}</td>
+      <td>${p.ct}</td>
+      <td>${p.rt}</td>
+      <td>${p.tat}</td>
+      <td>${p.wt}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* -------- ALGORITHM IMPLEMENTATIONS ----------- */
+
+function fcfs(processes) {
+  // Sort by arrival time
+  let proc = processes.map(p => ({...p}));
+  proc.sort((a,b) => a.at - b.at);
+
+  let time = 0;
+  let timeline = [];
+
+  for(let p of proc) {
+    if(time < p.at) time = p.at;
+    p.st = time;
+    p.rt = p.st - p.at;
+    p.ct = p.st + p.bt;
+    p.tat = p.ct - p.at;
+    p.wt = p.tat - p.bt;
+    timeline.push({pid: p.pid, start: p.st, end: p.ct});
+    time = p.ct;
+  }
+
+  return {timeline, processes: proc};
+}
+
+function sjf(processes) {
+  // Non-preemptive SJF
+  let proc = processes.map(p => ({...p, done: false}));
+  const n = proc.length;
+
+  let time = 0;
+  let completed = 0;
+  let timeline = [];
+
+  while(completed < n) {
+    // Find available processes not done
+    const available = proc.filter(p => !p.done && p.at <= time);
+
+    let current = null;
+    if(available.length > 0) {
+      // Choose with shortest bt
+      current = available.reduce((a,b) => (a.bt < b.bt ? a : b));
+    } else {
+      // If none available, jump time to earliest arrival not done
+      let earliest = proc.filter(p => !p.done).reduce((a,b) => (a.at < b.at ? a : b));
+      time = earliest.at;
+      continue;
+    }
+
+    current.st = time;
+    current.rt = current.st - current.at;
+    current.ct = current.st + current.bt;
+    current.tat = current.ct - current.at;
+    current.wt = current.tat - current.bt;
+
+    timeline.push({pid: current.pid, start: current.st, end: current.ct});
+
+    time = current.ct;
+    current.done = true;
+    completed++;
+  }
+
+  proc.forEach(p => delete p.done);
+  return {timeline, processes: proc};
+}
+
+function priorityScheduling(processes, priorityType) {
+  // Non-preemptive priority scheduling
+  // priorityType = "1" => lower number = higher priority
+  // priorityType = "2" => higher number = higher priority
+
+  let proc = processes.map(p => ({...p, done: false}));
+  const n = proc.length;
+
+  let time = 0;
+  let completed = 0;
+  let timeline = [];
+
+  while(completed < n) {
+    const available = proc.filter(p => !p.done && p.at <= time);
+
+    let current = null;
+    if(available.length > 0) {
+      if(priorityType === "1") {
+        current = available.reduce((a,b) => (a.pr < b.pr ? a : b));
+      } else {
+        current = available.reduce((a,b) => (a.pr > b.pr ? a : b));
+      }
+    } else {
+      let earliest = proc.filter(p => !p.done).reduce((a,b) => (a.at < b.at ? a : b));
+      time = earliest.at;
+      continue;
+    }
+
+    current.st = time;
+    current.rt = current.st - current.at;
+    current.ct = current.st + current.bt;
+    current.tat = current.ct - current.at;
+    current.wt = current.tat - current.bt;
+
+    timeline.push({pid: current.pid, start: current.st, end: current.ct});
+
+    time = current.ct;
+    current.done = true;
+    completed++;
+  }
+
+  proc.forEach(p => delete p.done);
+  return {timeline, processes: proc};
+}
+
+function roundRobin(processes, quantum) {
+  // Preemptive Round Robin
+  let proc = processes.map(p => ({
+    ...p,
+    remainingBT: p.bt,
+    st: null,
+    ct: null,
+    rt: null,
+  }));
+  const n = proc.length;
+
+  let time = 0;
+  let completed = 0;
+  let queue = [];
+  let timeline = [];
+
+  // Sort by arrival time
+  proc.sort((a,b) => a.at - b.at);
+
+  let i = 0; // index to add to queue
+  while(completed < n) {
+    // Add all arrived processes to queue
+    while(i < n && proc[i].at <= time) {
+      queue.push(proc[i]);
+      i++;
+    }
+
+    if(queue.length === 0) {
+      // If no processes ready, jump time to next arrival
+      if(i < n) {
+        time = proc[i].at;
+        continue;
+      }
+    }
+
+    const current = queue.shift();
+
+    if(current.st === null) {
+      current.st = time;
+      current.rt = current.st - current.at;
+    }
+
+    const execTime = Math.min(current.remainingBT, quantum);
+    timeline.push({pid: current.pid, start: time, end: time + execTime});
+
+    time += execTime;
+    current.remainingBT -= execTime;
+
+    // Add newly arrived processes during execution
+    while(i < n && proc[i].at <= time) {
+      queue.push(proc[i]);
+      i++;
+    }
+
+    if(current.remainingBT > 0) {
+      queue.push(current); // requeue
+    } else {
+      current.ct = time;
+      current.tat = current.ct - current.at;
+      current.wt = current.tat - current.bt;
+      completed++;
+    }
+  }
+
+  // Fill missing times for processes that never started (should not happen)
+  proc.forEach(p => {
+    if(p.st === null) {
+      p.st = p.at;
+      p.rt = 0;
+      p.ct = p.at + p.bt;
+      p.tat = p.bt;
+      p.wt = 0;
+    }
+  });
+
+  // Return original order with computed times
+  proc.sort((a,b) => processes.findIndex(p => p.pid === a.pid) - processes.findIndex(p => p.pid === b.pid));
+
+  return {timeline, processes: proc};
+}
+</script>
+
+</body>
+</html>
